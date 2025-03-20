@@ -1,0 +1,28 @@
+# Node.js dependencies  
+node_modules/  
+package-lock.json  
+yarn.lock  
+
+# Environment variables  
+.env  
+
+# Logs  
+logs/  
+*.log  
+debug.log  
+pm2.log  
+pm2.pid  
+
+# Build files  
+dist/  
+build/  
+
+# Cache and editor files  
+.cache/  
+.next/  
+.vscode/  
+.DS_Store  
+*.swp  
+
+# Public uploads (if any)  
+public/uploads/  
