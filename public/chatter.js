@@ -10,6 +10,12 @@ let socket;
 let username = '';
 let isJoined = false;
 
+// Typing indicator
+const typingIndicator = document.createElement('div');
+typingIndicator.classList.add('message', 'system', 'typing');
+let typingTimeout;
+let currentTypingUser = null; // Track who is typing
+
 // Join chat event
 joinBtn.addEventListener('click', joinChat);
 
@@ -36,15 +42,33 @@ function joinChat() {
     // Message from server
     socket.on('message', (message) => {
       displayMessage(message);
-      
-      // Scroll down
       chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
+    
+    // Typing events
+    socket.on('userTyping', (usernameTyping) => {
+      if (usernameTyping !== username) {
+        currentTypingUser = usernameTyping;
+        typingIndicator.innerText = `${usernameTyping} is typing...`;
+        if (!chatMessages.contains(typingIndicator)) {
+          chatMessages.appendChild(typingIndicator);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+      }
+    });
+
+    socket.on('userStopTyping', (usernameTyping) => {
+      if (usernameTyping === currentTypingUser && chatMessages.contains(typingIndicator)) {
+        chatMessages.removeChild(typingIndicator);
+        currentTypingUser = null;
+      }
     });
     
     // Enable message input
     socket.on('connect', () => {
-        msgInput.disabled = false; // ✅ Now enabled when joined
-      });
+      msgInput.disabled = false;
+    });
+    
     // Change button text
     joinBtn.textContent = 'Leave Chat';
     usernameInput.disabled = true;
@@ -52,6 +76,13 @@ function joinChat() {
     
     // Setup chat form submission event
     chatForm.addEventListener('submit', sendMessage);
+    
+    // Typing event listener
+    msgInput.addEventListener('input', () => {
+      socket.emit('typing', username);
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => socket.emit('stopTyping', username), 1000);
+    });
   } else {
     // Disconnect
     socket.disconnect();
@@ -80,17 +111,22 @@ function joinChat() {
 function sendMessage(e) {
   e.preventDefault();
   
-  // Get message text
   const msg = msgInput.value.trim();
   
   if (!msg) {
     return;
   }
   
-  // Emit message to server
-  socket.emit('chatMessage', msg);
+  const replyMatch = msg.match(/^Replying to "(.+?)": (.+)$/);
+  if (replyMatch) {
+    socket.emit('chatMessage', {
+      text: replyMatch[2],
+      replyTo: { text: replyMatch[1] }
+    });
+  } else {
+    socket.emit('chatMessage', msg);
+  }
   
-  // Clear input
   msgInput.value = '';
   msgInput.focus();
 }
@@ -99,6 +135,7 @@ function sendMessage(e) {
 function displayMessage(message) {
   const div = document.createElement('div');
   div.classList.add('message');
+  div.dataset.messageId = message.id || Date.now();
   
   if (message.username === username) {
     div.classList.add('user');
@@ -106,6 +143,13 @@ function displayMessage(message) {
     div.classList.add('system');
   } else {
     div.classList.add('other');
+  }
+  
+  if (message.replyTo) {
+    const replyDiv = document.createElement('div');
+    replyDiv.classList.add('reply-preview');
+    replyDiv.innerText = `Replying to: ${message.replyTo.text}`;
+    div.appendChild(replyDiv);
   }
   
   if (message.username !== 'ChatBot') {
@@ -121,6 +165,12 @@ function displayMessage(message) {
   div.appendChild(para);
   
   chatMessages.appendChild(div);
+  
+  // Add click to reply
+  div.addEventListener('click', () => {
+    msgInput.value = `Replying to "${message.text}": `;
+    msgInput.focus();
+  });
 }
 
 // Display users to DOM

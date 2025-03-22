@@ -33,25 +33,33 @@ io.on('connection', socket => {
   });
 
   // Listen for chat message
-  socket.on('chatMessage', msg => {
+  socket.on('chatMessage', (data) => {
     const user = getCurrentUser(socket.id);
-
     if (user) {
-      io.emit('message', formatMessage(user.username, msg));
+      const message = typeof data === 'string' 
+        ? formatMessage(user.username, data)
+        : formatMessage(user.username, data.text, data.replyTo);
+      io.emit('message', message);
     }
+  });
+
+  // Typing events
+  socket.on('typing', (username) => {
+    socket.broadcast.emit('userTyping', username);
+  });
+
+  socket.on('stopTyping', (username) => {
+    socket.broadcast.emit('userStopTyping', username); // Pass username here
   });
 
   // Runs when client disconnects
   socket.on('disconnect', () => {
     const user = userLeave(socket.id);
-
     if (user) {
       io.emit(
         'message',
         formatMessage(botName, `${user.username} has left the chat`)
       );
-
-      // Send users info
       io.emit('usersList', getRoomUsers());
     }
   });
