@@ -11,14 +11,17 @@
     <header class="chat-header">
       <h1>Chatter</h1>
       <div class="user-info">
-        <input type="text" id="username" placeholder="Your username">
-        <button id="join-btn">Join Chat</button>
+        <input type="text" id="username" placeholder="Your Name">
+        <input type="text" id="room-code" placeholder="Code (Admins leave it)">
+        <button id="join-btn">Join Room</button>
       </div>
     </header>
     
+    <div id="room-code-display" style="display: none; padding: 10px; background: #b27b6f; text-align: center;"></div>
+    
     <main class="chat-main">
       <div class="chat-sidebar">
-        <h3>Active Users</h3>
+        <h3>Active Users in Room</h3>
         <ul id="users"></ul>
       </div>
       

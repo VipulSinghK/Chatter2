@@ -16,51 +16,67 @@ const botName = 'ChatBot';
 
 // Run when client connects
 io.on('connection', socket => {
-  socket.on('joinChat', (username) => {
-    const user = userJoin(socket.id, username);
+  socket.on('joinRoom', ({ username, roomCode }) => {
+    const user = userJoin(socket.id, username, roomCode);
+    socket.join(user.room);
+
+    // Notify client of successful join
+    socket.emit('roomJoined', { success: true, message: `Welcome to room ${roomCode}!` });
 
     // Welcome current user
-    socket.emit('message', formatMessage(botName, 'Welcome to the Chat App!'));
+    socket.emit('message', formatMessage(botName, `Welcome to room ${roomCode}!`));
 
     // Broadcast when a user connects
-    socket.broadcast.emit(
+    socket.broadcast.to(user.room).emit(
       'message',
-      formatMessage(botName, `${user.username} has joined the chat`)
+      formatMessage(botName, `${user.username} has joined the room`)
     );
 
-    // Send users info
-    io.emit('usersList', getRoomUsers());
+    // Send users info for the room
+    io.to(user.room).emit('usersList', getRoomUsers(user.room));
   });
 
   // Listen for chat message
-  socket.on('chatMessage', (data) => {
+  socket.on('chatMessage', ({ text, replyTo, roomCode }) => {
     const user = getCurrentUser(socket.id);
     if (user) {
-      const message = typeof data === 'string' 
-        ? formatMessage(user.username, data)
-        : formatMessage(user.username, data.text, data.replyTo);
-      io.emit('message', message);
+      const message = replyTo
+        ? formatMessage(user.username, text, replyTo)
+        : formatMessage(user.username, text);
+      io.to(roomCode).emit('message', message);
     }
   });
 
   // Typing events
-  socket.on('typing', (username) => {
-    socket.broadcast.emit('userTyping', username);
+  socket.on('typing', ({ username, roomCode }) => {
+    socket.broadcast.to(roomCode).emit('userTyping', username);
   });
 
-  socket.on('stopTyping', (username) => {
-    socket.broadcast.emit('userStopTyping', username); // Pass username here
+  socket.on('stopTyping', ({ username, roomCode }) => {
+    socket.broadcast.to(roomCode).emit('userStopTyping', username);
+  });
+
+  // Handle leaving a room
+  socket.on('leaveRoom', ({ username, roomCode }) => {
+    const user = userLeave(socket.id);
+    if (user) {
+      io.to(roomCode).emit(
+        'message',
+        formatMessage(botName, `${user.username} has left the room`)
+      );
+      io.to(roomCode).emit('usersList', getRoomUsers(user.room));
+    }
   });
 
   // Runs when client disconnects
   socket.on('disconnect', () => {
     const user = userLeave(socket.id);
     if (user) {
-      io.emit(
+      io.to(user.room).emit(
         'message',
-        formatMessage(botName, `${user.username} has left the chat`)
+        formatMessage(botName, `${user.username} has left the room`)
       );
-      io.emit('usersList', getRoomUsers());
+      io.to(user.room).emit('usersList', getRoomUsers(user.room));
     }
   });
 });

@@ -2,25 +2,35 @@ const chatForm = document.getElementById('chat-form');
 const chatMessages = document.getElementById('chat-messages');
 const usersList = document.getElementById('users');
 const usernameInput = document.getElementById('username');
+const roomCodeInput = document.getElementById('room-code');
 const joinBtn = document.getElementById('join-btn');
 const msgInput = document.getElementById('msg');
+const roomCodeDisplay = document.getElementById('room-code-display'); // New element for displaying code
 
 // Initialize variables
 let socket;
 let username = '';
+let roomCode = '';
 let isJoined = false;
+let isAdmin = false;
 
 // Typing indicator
 const typingIndicator = document.createElement('div');
 typingIndicator.classList.add('message', 'system', 'typing');
 let typingTimeout;
-let currentTypingUser = null; // Track who is typing
+let currentTypingUser = null;
+
+// Generate a unique room code (simple random string for demo; could use UUID in production)
+function generateRoomCode() {
+  return 'ROOM-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+}
 
 // Join chat event
 joinBtn.addEventListener('click', joinChat);
 
 function joinChat() {
   username = usernameInput.value.trim();
+  roomCode = roomCodeInput.value.trim();
   
   if (!username) {
     alert('Please enter a username');
@@ -31,67 +41,84 @@ function joinChat() {
     // Connect to socket.io
     socket = io();
     
-    // Send username to server
-    socket.emit('joinChat', username);
+    // If no room code provided, assume admin and generate one
+    if (!roomCode) {
+      isAdmin = true;
+      roomCode = generateRoomCode();
+      roomCodeDisplay.innerText = `Your Room Code: ${roomCode} (Share this with others)`;
+      roomCodeDisplay.style.display = 'block';
+    }
     
-    // Get users list
-    socket.on('usersList', (users) => {
-      displayUsers(users);
-    });
+    // Send username and room code to server
+    socket.emit('joinRoom', { username, roomCode });
     
-    // Message from server
-    socket.on('message', (message) => {
-      displayMessage(message);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    });
-    
-    // Typing events
-    socket.on('userTyping', (usernameTyping) => {
-      if (usernameTyping !== username) {
-        currentTypingUser = usernameTyping;
-        typingIndicator.innerText = `${usernameTyping} is typing...`;
-        if (!chatMessages.contains(typingIndicator)) {
-          chatMessages.appendChild(typingIndicator);
+    // Handle room join response
+    socket.on('roomJoined', ({ success, message }) => {
+      if (success) {
+        // Get users list for the room
+        socket.on('usersList', (users) => {
+          displayUsers(users);
+        });
+        
+        // Message from server
+        socket.on('message', (message) => {
+          displayMessage(message);
           chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-      }
-    });
+        });
+        
+        // Typing events
+        socket.on('userTyping', (usernameTyping) => {
+          if (usernameTyping !== username) {
+            currentTypingUser = usernameTyping;
+            typingIndicator.innerText = `${usernameTyping} is typing...`;
+            if (!chatMessages.contains(typingIndicator)) {
+              chatMessages.appendChild(typingIndicator);
+              chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+          }
+        });
 
-    socket.on('userStopTyping', (usernameTyping) => {
-      if (usernameTyping === currentTypingUser && chatMessages.contains(typingIndicator)) {
-        chatMessages.removeChild(typingIndicator);
-        currentTypingUser = null;
+        socket.on('userStopTyping', (usernameTyping) => {
+          if (usernameTyping === currentTypingUser && chatMessages.contains(typingIndicator)) {
+            chatMessages.removeChild(typingIndicator);
+            currentTypingUser = null;
+          }
+        });
+        
+        // Enable message input
+        msgInput.disabled = false;
+        joinBtn.textContent = 'Leave Room';
+        usernameInput.disabled = true;
+        roomCodeInput.disabled = true;
+        isJoined = true;
+        
+        // Setup chat form submission event
+        chatForm.addEventListener('submit', sendMessage);
+        
+        // Typing event listener
+        msgInput.addEventListener('input', () => {
+          socket.emit('typing', { username, roomCode });
+          clearTimeout(typingTimeout);
+          typingTimeout = setTimeout(() => socket.emit('stopTyping', { username, roomCode }), 1000);
+        });
+      } else {
+        alert(message);
+        socket.disconnect();
       }
-    });
-    
-    // Enable message input
-    socket.on('connect', () => {
-      msgInput.disabled = false;
-    });
-    
-    // Change button text
-    joinBtn.textContent = 'Leave Chat';
-    usernameInput.disabled = true;
-    isJoined = true;
-    
-    // Setup chat form submission event
-    chatForm.addEventListener('submit', sendMessage);
-    
-    // Typing event listener
-    msgInput.addEventListener('input', () => {
-      socket.emit('typing', username);
-      clearTimeout(typingTimeout);
-      typingTimeout = setTimeout(() => socket.emit('stopTyping', username), 1000);
     });
   } else {
     // Disconnect
+    socket.emit('leaveRoom', { username, roomCode });
     socket.disconnect();
     
     // Reset UI
-    joinBtn.textContent = 'Join Chat';
+    joinBtn.textContent = 'Join Room';
     usernameInput.disabled = false;
+    roomCodeInput.disabled = false;
     msgInput.disabled = true;
     isJoined = false;
+    isAdmin = false;
+    roomCodeDisplay.style.display = 'none';
     
     // Clear users list
     usersList.innerHTML = '';
@@ -99,7 +126,7 @@ function joinChat() {
     // Add system message
     const div = document.createElement('div');
     div.classList.add('message', 'system');
-    div.innerText = 'You left the chat';
+    div.innerText = `You left the room with code ${roomCode}`;
     chatMessages.appendChild(div);
     
     // Remove event listener
@@ -121,10 +148,11 @@ function sendMessage(e) {
   if (replyMatch) {
     socket.emit('chatMessage', {
       text: replyMatch[2],
-      replyTo: { text: replyMatch[1] }
+      replyTo: { text: replyMatch[1] },
+      roomCode
     });
   } else {
-    socket.emit('chatMessage', msg);
+    socket.emit('chatMessage', { text: msg, roomCode });
   }
   
   msgInput.value = '';
