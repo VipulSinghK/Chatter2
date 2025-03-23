@@ -5,27 +5,55 @@ const usernameInput = document.getElementById('username');
 const roomCodeInput = document.getElementById('room-code');
 const joinBtn = document.getElementById('join-btn');
 const msgInput = document.getElementById('msg');
-const roomCodeDisplay = document.getElementById('room-code-display'); // New element for displaying code
+const roomCodeDisplay = document.getElementById('room-code-display');
 
-// Initialize variables
 let socket;
 let username = '';
 let roomCode = '';
 let isJoined = false;
 let isAdmin = false;
 
-// Typing indicator
+// Add notification sound
+const notificationSound = new Audio('/notification.mp3');
+
 const typingIndicator = document.createElement('div');
 typingIndicator.classList.add('message', 'system', 'typing');
 let typingTimeout;
 let currentTypingUser = null;
 
-// Generate a unique room code (simple random string for demo; could use UUID in production)
+// Create the file upload button once
+const fileBtn = document.createElement('button');
+fileBtn.textContent = 'Upload File';
+fileBtn.className = 'btn';
+fileBtn.type = 'button'; // Prevent form submission
+let isFileBtnAdded = false; // Flag to track if the button is already added
+
+// Add the file upload event listener once, outside joinChat
+fileBtn.addEventListener('click', () => {
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*,.pdf';
+  fileInput.onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        socket.emit('fileUpload', { 
+          file: reader.result, 
+          filename: file.name, 
+          roomCode 
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  fileInput.click();
+});
+
 function generateRoomCode() {
   return 'ROOM-' + Math.random().toString(36).substr(2, 6).toUpperCase();
 }
 
-// Join chat event
 joinBtn.addEventListener('click', joinChat);
 
 function joinChat() {
@@ -38,10 +66,8 @@ function joinChat() {
   }
   
   if (!isJoined) {
-    // Connect to socket.io
     socket = io();
     
-    // If no room code provided, assume admin and generate one
     if (!roomCode) {
       isAdmin = true;
       roomCode = generateRoomCode();
@@ -49,24 +75,29 @@ function joinChat() {
       roomCodeDisplay.style.display = 'block';
     }
     
-    // Send username and room code to server
     socket.emit('joinRoom', { username, roomCode });
     
-    // Handle room join response
     socket.on('roomJoined', ({ success, message }) => {
       if (success) {
-        // Get users list for the room
         socket.on('usersList', (users) => {
           displayUsers(users);
         });
         
-        // Message from server
         socket.on('message', (message) => {
+          // Play sound for messages from others
+          if (message.username !== username) {
+            notificationSound.play().catch(error => {
+              console.log('Audio playback failed:', error);
+            });
+          }
           displayMessage(message);
           chatMessages.scrollTop = chatMessages.scrollHeight;
         });
         
-        // Typing events
+        socket.on('messageUpdate', (message) => {
+          updateMessage(message);
+        });
+        
         socket.on('userTyping', (usernameTyping) => {
           if (usernameTyping !== username) {
             currentTypingUser = usernameTyping;
@@ -85,17 +116,20 @@ function joinChat() {
           }
         });
         
-        // Enable message input
         msgInput.disabled = false;
         joinBtn.textContent = 'Leave Room';
         usernameInput.disabled = true;
         roomCodeInput.disabled = true;
         isJoined = true;
         
-        // Setup chat form submission event
         chatForm.addEventListener('submit', sendMessage);
+
+        // Add the file button only if it hasn't been added yet
+        if (!isFileBtnAdded) {
+          chatForm.appendChild(fileBtn);
+          isFileBtnAdded = true;
+        }
         
-        // Typing event listener
         msgInput.addEventListener('input', () => {
           socket.emit('typing', { username, roomCode });
           clearTimeout(typingTimeout);
@@ -107,11 +141,9 @@ function joinChat() {
       }
     });
   } else {
-    // Disconnect
     socket.emit('leaveRoom', { username, roomCode });
     socket.disconnect();
     
-    // Reset UI
     joinBtn.textContent = 'Join Room';
     usernameInput.disabled = false;
     roomCodeInput.disabled = false;
@@ -120,29 +152,21 @@ function joinChat() {
     isAdmin = false;
     roomCodeDisplay.style.display = 'none';
     
-    // Clear users list
     usersList.innerHTML = '';
     
-    // Add system message
     const div = document.createElement('div');
     div.classList.add('message', 'system');
     div.innerText = `You left the room with code ${roomCode}`;
     chatMessages.appendChild(div);
     
-    // Remove event listener
     chatForm.removeEventListener('submit', sendMessage);
   }
 }
 
-// Send message to server
 function sendMessage(e) {
   e.preventDefault();
-  
   const msg = msgInput.value.trim();
-  
-  if (!msg) {
-    return;
-  }
+  if (!msg) return;
   
   const replyMatch = msg.match(/^Replying to "(.+?)": (.+)$/);
   if (replyMatch) {
@@ -159,19 +183,20 @@ function sendMessage(e) {
   msgInput.focus();
 }
 
-// Display message to DOM
 function displayMessage(message) {
+  const existingMessage = document.querySelector(`.message[data-message-id="${message.id}"]`);
+  if (existingMessage) {
+    updateMessage(message);
+    return;
+  }
+
   const div = document.createElement('div');
   div.classList.add('message');
-  div.dataset.messageId = message.id || Date.now();
+  div.dataset.messageId = message.id;
   
-  if (message.username === username) {
-    div.classList.add('user');
-  } else if (message.username === 'ChatBot') {
-    div.classList.add('system');
-  } else {
-    div.classList.add('other');
-  }
+  if (message.username === username) div.classList.add('user');
+  else if (message.username === 'ChatBot') div.classList.add('system');
+  else div.classList.add('other');
   
   if (message.replyTo) {
     const replyDiv = document.createElement('div');
@@ -183,25 +208,91 @@ function displayMessage(message) {
   if (message.username !== 'ChatBot') {
     const meta = document.createElement('div');
     meta.classList.add('meta');
-    meta.innerHTML = `<span>${message.username}</span> <span>${message.time}</span>`;
+    meta.innerHTML = `<span>${message.username}</span>`;
     div.appendChild(meta);
   }
   
-  const para = document.createElement('p');
-  para.classList.add('text');
-  para.innerText = message.text;
-  div.appendChild(para);
+  const contentDiv = document.createElement('div');
+  contentDiv.classList.add('content');
+  
+  if (message.file) {
+    if (message.file.data.startsWith('data:image')) {
+      const img = document.createElement('img');
+      img.src = message.file.data;
+      img.style.maxWidth = '200px';
+      contentDiv.appendChild(img);
+    }
+    const fileInfo = document.createElement('p');
+    fileInfo.classList.add('text');
+    fileInfo.innerText = message.text;
+    contentDiv.appendChild(fileInfo);
+    
+    const downloadBtn = document.createElement('button');
+    downloadBtn.classList.add('download-btn');
+    downloadBtn.innerText = 'Download';
+    downloadBtn.addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.href = message.file.data;
+      link.download = message.file.filename;
+      link.click();
+    });
+    contentDiv.appendChild(downloadBtn);
+  } else {
+    const para = document.createElement('p');
+    para.classList.add('text');
+    para.innerText = message.text;
+    contentDiv.appendChild(para);
+  }
+  div.appendChild(contentDiv);
+
+  if (message.username !== 'ChatBot') {
+    const reactionsDiv = document.createElement('div');
+    reactionsDiv.classList.add('reactions');
+    if (message.reactions) {
+      reactionsDiv.innerHTML = Object.entries(message.reactions)
+        .map(([emoji, count]) => `<span class="reaction">${emoji} ${count}</span>`)
+        .join(' ');
+    }
+    div.appendChild(reactionsDiv);
+
+    const reactionButtons = document.createElement('div');
+    reactionButtons.classList.add('reaction-buttons');
+    ['👍', '❤️', '😂'].forEach(emoji => {
+      const btn = document.createElement('button');
+      btn.textContent = emoji;
+      btn.classList.add('reaction-btn');
+      btn.addEventListener('click', () => {
+        socket.emit('addReaction', { messageId: message.id, emoji, roomCode });
+        btn.classList.add('reacted');
+        setTimeout(() => btn.classList.remove('reacted'), 300);
+      });
+      reactionButtons.appendChild(btn);
+    });
+    div.appendChild(reactionButtons);
+  }
   
   chatMessages.appendChild(div);
   
-  // Add click to reply
-  div.addEventListener('click', () => {
-    msgInput.value = `Replying to "${message.text}": `;
-    msgInput.focus();
+  div.addEventListener('click', (e) => {
+    if (!e.target.closest('.reaction-buttons') && !e.target.closest('.download-btn')) {
+      msgInput.value = `Replying to "${message.text}": `;
+      msgInput.focus();
+    }
   });
 }
 
-// Display users to DOM
+function updateMessage(message) {
+  const messageElement = document.querySelector(`.message[data-message-id="${message.id}"]`);
+  if (messageElement && message.username !== 'ChatBot') {
+    const reactionsDiv = messageElement.querySelector('.reactions');
+    if (message.reactions) {
+      reactionsDiv.innerHTML = Object.entries(message.reactions)
+        .map(([emoji, count]) => `<span class="reaction">${emoji} ${count}</span>`)
+        .join(' ');
+    }
+  }
+}
+
 function displayUsers(users) {
   usersList.innerHTML = '';
   users.forEach((user) => {
@@ -211,5 +302,4 @@ function displayUsers(users) {
   });
 }
 
-// Disable message input until joined
 msgInput.disabled = true;
