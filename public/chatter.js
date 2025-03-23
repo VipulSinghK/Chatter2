@@ -6,6 +6,8 @@ const roomCodeInput = document.getElementById('room-code');
 const joinBtn = document.getElementById('join-btn');
 const msgInput = document.getElementById('msg');
 const roomCodeDisplay = document.getElementById('room-code-display');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const chatSidebar = document.querySelector('.chat-sidebar');
 
 let socket;
 let username = '';
@@ -13,7 +15,6 @@ let roomCode = '';
 let isJoined = false;
 let isAdmin = false;
 
-// Add notification sound
 const notificationSound = new Audio('/notification.mp3');
 
 const typingIndicator = document.createElement('div');
@@ -21,14 +22,12 @@ typingIndicator.classList.add('message', 'system', 'typing');
 let typingTimeout;
 let currentTypingUser = null;
 
-// Create the file upload button once
 const fileBtn = document.createElement('button');
 fileBtn.textContent = 'Upload File';
 fileBtn.className = 'btn';
-fileBtn.type = 'button'; // Prevent form submission
-let isFileBtnAdded = false; // Flag to track if the button is already added
+fileBtn.type = 'button';
+let isFileBtnAdded = false;
 
-// Add the file upload event listener once, outside joinChat
 fileBtn.addEventListener('click', () => {
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
@@ -48,6 +47,10 @@ fileBtn.addEventListener('click', () => {
     }
   };
   fileInput.click();
+});
+
+sidebarToggle.addEventListener('click', () => {
+  chatSidebar.classList.toggle('active');
 });
 
 function generateRoomCode() {
@@ -84,7 +87,6 @@ function joinChat() {
         });
         
         socket.on('message', (message) => {
-          // Play sound for messages from others
           if (message.username !== username) {
             notificationSound.play().catch(error => {
               console.log('Audio playback failed:', error);
@@ -124,7 +126,6 @@ function joinChat() {
         
         chatForm.addEventListener('submit', sendMessage);
 
-        // Add the file button only if it hasn't been added yet
         if (!isFileBtnAdded) {
           chatForm.appendChild(fileBtn);
           isFileBtnAdded = true;
@@ -135,6 +136,10 @@ function joinChat() {
           clearTimeout(typingTimeout);
           typingTimeout = setTimeout(() => socket.emit('stopTyping', { username, roomCode }), 1000);
         });
+
+        if (window.innerWidth <= 768) {
+          chatSidebar.classList.remove('active');
+        }
       } else {
         alert(message);
         socket.disconnect();
@@ -303,3 +308,9 @@ function displayUsers(users) {
 }
 
 msgInput.disabled = true;
+
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 768) {
+    chatSidebar.classList.remove('active');
+  }
+});
