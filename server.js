@@ -7,7 +7,8 @@ const { userJoin, getCurrentUser, userLeave, getRoomUsers } = require('./utils/u
 
 const app = express();
 const server = http.createServer(app);
-const io = socketio(server);
+// Increase max payload size to 50MB (default is 1MB)
+const io = socketio(server, { maxHttpBufferSize: 50 * 1024 * 1024 });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -61,11 +62,17 @@ io.on('connection', socket => {
   socket.on('fileUpload', ({ file, filename, roomCode }) => {
     const user = getCurrentUser(socket.id);
     if (user) {
-      const message = formatMessage(user.username, 'Shared a file: ' + filename);
-      message.file = { data: file, filename };
-      const messages = roomMessages.get(roomCode);
-      messages.set(message.id, message);
-      io.to(roomCode).emit('message', message);
+      try {
+        console.log(`Received file: ${filename}, Size: ${file.length} bytes`);
+        const message = formatMessage(user.username, 'Shared a file: ' + filename);
+        message.file = { data: file, filename };
+        const messages = roomMessages.get(roomCode);
+        messages.set(message.id, message);
+        io.to(roomCode).emit('message', message);
+      } catch (error) {
+        console.error('Error handling fileUpload:', error);
+        socket.emit('message', formatMessage(botName, 'Failed to process file upload.'));
+      }
     }
   });
 
@@ -91,6 +98,10 @@ io.on('connection', socket => {
       io.to(user.room).emit('message', formatMessage(botName, `${user.username} has left the room`));
       io.to(user.room).emit('usersList', getRoomUsers(user.room));
     }
+  });
+
+  socket.on('error', (error) => {
+    console.error('Socket error:', error);
   });
 });
 

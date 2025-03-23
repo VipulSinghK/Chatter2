@@ -8,7 +8,43 @@
   <link rel="stylesheet" href="chatter.css">
 </head>
 <body>
-  <div class="chat-container">
+  <!-- Welcome Card -->
+  <div class="welcome-card" id="welcome-card">
+    <div class="welcome-slide active" data-slide="0">
+      <h2>Welcome to Chatter!</h2>
+      <p>Discover a fun and interactive way to chat with friends.</p>
+    </div>
+    <div class="welcome-slide" data-slide="1">
+      <h2>Text Messaging</h2>
+      <p>Send and receive messages in real-time with ease.</p>
+    </div>
+    <div class="welcome-slide" data-slide="2">
+      <h2>File Sharing</h2>
+      <p>Share images, videos, and PDFs with others in your room.</p>
+    </div>
+    <div class="welcome-slide" data-slide="3">
+      <h2>Reactions</h2>
+      <p>Add emojis like 👍, ❤️, and 😂 to express yourself.</p>
+    </div>
+    <div class="welcome-slide" data-slide="4">
+      <h2>Typing Indicators</h2>
+      <p>See when others are typing to keep the conversation flowing.</p>
+    </div>
+    <div class="welcome-buttons">
+      <button id="skip-btn">Skip</button>
+      <button id="next-btn">Next</button>
+    </div>
+    <div class="progress-dots">
+      <span class="dot active" data-dot="0"></span>
+      <span class="dot" data-dot="1"></span>
+      <span class="dot" data-dot="2"></span>
+      <span class="dot" data-dot="3"></span>
+      <span class="dot" data-dot="4"></span>
+    </div>
+  </div>
+
+  <!-- Main Chat App -->
+  <div class="chat-container" id="chat-container" style="display: none;">
     <header class="chat-header">
       <button class="sidebar-toggle" id="sidebar-toggle">☰</button>
       <h1>Chatter</h1>
@@ -44,7 +80,7 @@
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
   <script src="chatter.js"></script>
 </body>
 </html>

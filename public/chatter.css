@@ -338,6 +338,116 @@ a:focus, button:focus, input:focus {
   background: #3040d6;
 }
 
+/* Welcome Card Styles */
+.welcome-card {
+  width: 100%;
+  max-width: 500px;
+  background: linear-gradient(135deg, #6b48ff, #3040d6);
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  padding: 2rem;
+  color: #fff;
+  text-align: center;
+  position: relative;
+  z-index: 1000;
+  animation: cardFadeIn 0.5s ease-in-out;
+}
+
+.welcome-slide {
+  display: none;
+}
+
+.welcome-slide.active {
+  display: block;
+  animation: slideFadeIn 0.5s ease-in-out;
+}
+
+.welcome-slide h2 {
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
+}
+
+.welcome-slide p {
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.welcome-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.welcome-buttons button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 25px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+#skip-btn {
+  background: #ff6b6b;
+  color: #fff;
+}
+
+#skip-btn:hover {
+  background: #ff3b3b;
+  transform: scale(1.05);
+}
+
+#next-btn {
+  background: #4895ef;
+  color: #fff;
+}
+
+#next-btn:hover {
+  background: #2c7be5;
+  transform: scale(1.05);
+}
+
+/* Progress Dots Styles */
+.progress-dots {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.dot.active {
+  background: #fff;
+  transform: scale(1.2);
+}
+
+.dot:hover {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes cardFadeOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.9); }
+}
+
+@keyframes slideFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (max-width: 1024px) {
   .chat-container { height: 95vh; }
   .chat-sidebar { width: 200px; }
@@ -364,6 +474,7 @@ a:focus, button:focus, input:focus {
   #chat-form input { padding: 0.625rem; font-size: 0.875rem; }
   #chat-form button { padding: 0.625rem 0.875rem; }
   .sidebar-toggle { display: block; }
+  .welcome-card { max-width: 90%; padding: 1.5rem; }
 }
 
 @media (max-width: 480px) {
@@ -375,4 +486,8 @@ a:focus, button:focus, input:focus {
   #chat-form button { padding: 0.5rem 0.75rem; }
   .message { padding: 0.625rem; font-size: 0.875rem; max-width: 95%; }
   .chat-messages { padding: 0.75rem; }
+  .welcome-slide h2 { font-size: 1.5rem; }
+  .welcome-slide p { font-size: 0.9rem; }
+  .welcome-buttons button { padding: 0.5rem 1rem; font-size: 0.9rem; }
+  .dot { width: 8px; height: 8px; }
 }
